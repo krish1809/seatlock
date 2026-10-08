@@ -1,6 +1,7 @@
 """Apply db/migrations/*.sql in filename order, each exactly once.
 
-Usage: python db/migrate.py   (`make migrate` runs it in the api container)
+Usage: python db/migrate.py   (`make migrate` runs it in the api container;
+tests call migrate() on their own database)
 
 Each file runs in its own transaction together with the INSERT that records it
 in schema_migrations. PostgreSQL DDL is transactional, so a failing migration
@@ -14,10 +15,10 @@ import psycopg
 MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 
-def main() -> None:
+def migrate(conninfo: str) -> None:
     # autocommit=True so that each `with conn.transaction()` below is a real
     # BEGIN ... COMMIT, not a savepoint inside one long transaction.
-    with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as conn:
+    with psycopg.connect(conninfo, autocommit=True) as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -44,4 +45,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    migrate(os.environ["DATABASE_URL"])
