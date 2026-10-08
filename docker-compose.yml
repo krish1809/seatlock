@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Postgres 18 images keep data in /var/lib/postgresql/18/docker, so the
+      # volume is mounted one level up (not at .../data as in 17 and older).
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      # -h 127.0.0.1 forces a TCP check. During first-time init the image runs a
+      # temporary server on the Unix socket only, then restarts it; checking
+      # over TCP means we only report healthy once the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      # Source is bind-mounted so code and migration edits need no rebuild.
+      - ./:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # Healthy only when /health answers, i.e. the pool is open and SELECT 1
+      # works. `make up` waits for this. (The slim image has no curl.)
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:
