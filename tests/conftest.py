@@ -20,6 +20,8 @@ TEST_DB = "seatlock_test"
 ADMIN_URL = os.environ["DATABASE_URL"]
 os.environ["DATABASE_URL"] = make_conninfo(ADMIN_URL, dbname=TEST_DB)
 TEST_URL = os.environ["DATABASE_URL"]
+# Enough pooled connections for 50 threads to run their transactions at once.
+os.environ["DB_POOL_SIZE"] = "55"
 
 
 @pytest.fixture(scope="session", autouse=True)
