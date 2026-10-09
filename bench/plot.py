@@ -54,7 +54,7 @@ def medians(rows, keys, value):
         k = tuple(r[key] for key in keys)
         if r.get("status", "ok") != "ok":
             failed[k] += 1
-        elif r.get(value, "") != "":
+        elif value_of(r, value) != "":
             values[k].append(float(value_of(r, value)))
     return {k: statistics.median(v) for k, v in values.items()}, failed
 
@@ -72,7 +72,7 @@ def fmt(v):
 
 
 def finish(fig, name, subtitle):
-    fig.text(0.01, 0.01, subtitle, color=MUTED, fontsize=8)
+    fig.text(0.01, -0.01, subtitle, color=MUTED, fontsize=8, va="top")
     IMG.mkdir(parents=True, exist_ok=True)
     fig.savefig(IMG / name, dpi=150, bbox_inches="tight")
     plt.close(fig)
@@ -100,7 +100,7 @@ def grouped_bars(ax, groups, series, value, color_of, label_values=True):
 
 def failed_note(failed):
     n = sum(failed.values())
-    return f"{n} failed run(s) excluded" if n else "no failed runs"
+    return f"{n} failed or invalid run(s) excluded (bench/results/INVALID_RUNS.md)" if n else "no runs excluded"
 
 
 def double_bookings(bench_rows, oversell):
@@ -112,8 +112,8 @@ def double_bookings(bench_rows, oversell):
                  lambda c, s: med.get((s, c)), COLOR.get)
     ax.set_xticklabels([f"{c} clients" for c in clients])
     ax.set_ylabel("double-booked holds per run")
-    ax.set_title("Double bookings per strategy (hot-seat workload)")
-    ax.legend(ncols=5, loc="upper left", bbox_to_anchor=(0, -0.1))
+    ax.set_title("Double bookings per strategy (hot-seat workload)", pad=30)
+    ax.legend(ncols=5, loc="lower left", bbox_to_anchor=(0, 1.0))
     finish(fig, "double_bookings.png",
            "Successful holds whose time window overlapped another successful hold on the same seat. "
            f"Median of runs; source bench/results/oversell.csv; {failed_note(failed)}.")
@@ -132,16 +132,15 @@ def throughput(bench_rows):
                 continue
             xs, ys = zip(*pts)
             ax.plot(xs, ys, color=COLOR[s], linewidth=2, marker="o", markersize=5, label=s)
-            ax.annotate(f"{s} {fmt(ys[-1])}", (xs[-1], ys[-1]), xytext=(6, 0), textcoords="offset points",
-                        va="center", fontsize=7, color=INK_2)
-        ax.set_title(title)
+        ax.set_title(title, pad=30)
         ax.set_xlabel("concurrent clients")
         ax.set_ylabel("requests per second")
         ax.set_ylim(bottom=0)
         ax.set_xticks(sorted({int(r["clients"]) for r in rows}) or [0])
-    axes[0].legend(ncols=5, loc="upper left", bbox_to_anchor=(0, -0.15))
+    axes[0].legend(ncols=5, loc="lower left", bbox_to_anchor=(0, 1.0))
     fig.tight_layout()
-    finish(fig, "throughput.png", "Median requests/s over the 60 s measured window; source bench/results/benchmark.csv; "
+    finish(fig, "throughput.png", "Median requests/s over the 60 s measured window (exact values: README tables); "
+           "source bench/results/benchmark.csv; "
            + "; ".join(notes) + ".")
 
 
@@ -155,6 +154,10 @@ def latency(bench_rows, clients="200"):
         notes.append(f"{workload}: {failed_note(medians(rows, ['strategy'], 'rps')[1])}")
         grouped_bars(ax, STRATEGIES, list(PERCENTILE_COLOR),
                      lambda s, p: meds[p].get((s,)), PERCENTILE_COLOR.get)
+        for i, s in enumerate(STRATEGIES):
+            if (s,) not in meds["p50"]:
+                ax.annotate("no valid runs", (i, 0), xytext=(0, 4), textcoords="offset points",
+                            ha="center", va="bottom", fontsize=8, color=MUTED, rotation=90)
         ax.set_xticklabels(STRATEGIES)
         ax.set_title(f"{title} ({clients} clients)")
         ax.set_ylabel("milliseconds")
@@ -171,10 +174,11 @@ def retry_rate(bench_rows, clients="200"):
     vals = [med.get((s,), 0) for s in STRATEGIES]
     bars = ax.bar(STRATEGIES, vals, color=[COLOR[s] for s in STRATEGIES], width=0.6)
     for b, v in zip(bars, vals):
-        ax.annotate(f"{v:.1f}", (b.get_x() + b.get_width() / 2, v), xytext=(0, 2),
+        ax.annotate(f"{v:.2f}", (b.get_x() + b.get_width() / 2, v), xytext=(0, 2),
                     textcoords="offset points", ha="center", fontsize=8, color=INK_2)
     ax.grid(axis="x", visible=False)
     ax.set_ylabel("retries per 100 hold requests")
+    ax.set_ylim(bottom=0)
     ax.set_title(f"Retries on 40001/40P01, hot seat, {clients} clients")
     finish(fig, "retry_rate.png", "Retries counted by the api (/metrics) for the whole run; "
            f"source bench/results/benchmark.csv; {failed_note(failed)}.")
@@ -197,6 +201,9 @@ def deadlocks(rows):
 
 
 def pool_size(rows):
+    if not any(r.get("status") == "ok" for r in rows):
+        print("skip: pool_size.png, no valid pool study runs (see bench/results/INVALID_RUNS.md)")
+        return
     sizes = sorted({int(r["pool_size"]) for r in rows})
     rps, failed = medians(rows, ["pool_size"], "rps")
     p99, _ = medians(rows, ["pool_size"], "p99_ms")

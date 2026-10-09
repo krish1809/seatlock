@@ -21,6 +21,7 @@ psql_value() { docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POS
     echo "| Logical CPUs | $(nproc) |"
     echo "| RAM | $(free -h | awk '/^Mem:/ {print $2 " total, " $7 " available at collection time"}') |"
     echo "| OS | $(. /etc/os-release && echo "$PRETTY_NAME"), kernel $(uname -r) |"
+    echo "| Power source at collection time | $(source bench/lib.sh; on_mains_power && echo AC || echo battery) |"
     echo "| Load average (1/5/15 min) | $(cut -d' ' -f1-3 /proc/loadavg) |"
     echo "| Other running containers | $(( $(docker ps -q | wc -l) - $(docker compose ps -q | wc -l) )) (not part of SeatLock) |"
     echo

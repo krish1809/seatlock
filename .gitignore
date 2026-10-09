@@ -4,4 +4,4 @@ __pycache__/
 .pytest_cache/
 .venv/
 # Raw per-run hold logs are large; bench/results/oversell.csv keeps what they prove.
-bench/results/raw/**/holds.jsonl
+bench/results/raw*/**/holds.jsonl

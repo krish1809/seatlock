@@ -29,18 +29,19 @@ run_one() {  # workload strategy clients repeat
     local workload=$1 strategy=$2 clients=$3 repeat=$4
     local dir=$RESULTS/raw/$workload/$strategy/c${clients}_r${repeat}
     local labels="workload=$workload strategy=$strategy clients=$clients repeat=$repeat"
+    require_mains_power  # before touching $dir: never delete a valid earlier run
     rm -rf "$dir" && mkdir -p "$dir"
     echo "=== $(date +%H:%M:%S) $labels"
-
     if ! reset_and_start_api HOLD_STRATEGY="$strategy" EXPIRY_SWEEP_SECONDS="${SWEEP[$workload]}"; then
         record_failure benchmark.csv $labels
         return
     fi
-    if run_locust "$dir" "${USER_CLASS[$workload]}" "$clients" -e HOLD_LOG="/app/$dir/holds.jsonl" &&
-       record_run "$dir" benchmark.csv $labels &&
-       { [ "$workload" != hot ] || verify_oversell "$dir" "$strategy" "$clients" "$repeat"; }; then
-        :
-    else
+    if ! run_locust "$dir" "${USER_CLASS[$workload]}" "$clients" -e HOLD_LOG="/app/$dir/holds.jsonl"; then
+        record_failure benchmark.csv $labels
+    elif ! power_held "$dir"; then
+        record_invalid "$dir" benchmark.csv $labels
+    elif ! { record_run "$dir" benchmark.csv $labels &&
+             { [ "$workload" != hot ] || verify_oversell "$dir" "$strategy" "$clients" "$repeat"; }; }; then
         record_failure benchmark.csv $labels
     fi
 }

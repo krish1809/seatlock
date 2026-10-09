@@ -7,7 +7,7 @@ RUN := $(COMPOSE) run --rm api
 include .env
 PSQL := $(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -q -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-.PHONY: up down migrate seed seed-large test bench deadlock isolation index-study pool-study plot env
+.PHONY: up down migrate seed seed-large test bench deadlock isolation index-study pool-study plot summary env
 
 # Created only if missing; edit .env afterwards to change ports or credentials.
 .env:
@@ -42,6 +42,10 @@ pool-study:
 
 plot:
 	$(RUN) python bench/plot.py
+
+# Markdown result tables for the README, computed from bench/results/*.csv.
+summary:
+	$(RUN) python bench/summary.py
 
 env:
 	bash bench/environment.sh

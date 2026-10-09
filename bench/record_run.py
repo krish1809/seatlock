@@ -5,6 +5,11 @@ and RUN_DIR/metrics.json (the api's /metrics counters after the run).
 
 Usage: python bench/record_run.py RUN_DIR OUT_CSV key=value ...      (a finished run)
        python bench/record_run.py --failed OUT_CSV key=value ...     (a run that failed)
+       python bench/record_run.py --invalid RUN_DIR OUT_CSV key=value ...
+           (measured, but not comparable, e.g. the laptop lost AC power: the
+            numbers are kept as evidence and every summary and chart skips them)
+A row with the same key=value labels as an existing row replaces it, so a
+re-run overwrites the earlier attempt instead of adding a duplicate.
 """
 import csv
 import json
@@ -39,21 +44,27 @@ def parse(run_dir: Path) -> dict:
 
 
 def main(argv):
-    failed = argv[0] == "--failed"
-    if failed:
+    if argv[0] == "--failed":
         out, labels = Path(argv[1]), argv[2:]
         row = {"status": "failed"}
     else:
+        status = "ok"
+        if argv[0] == "--invalid":
+            status, argv = "invalid", argv[1:]
         run_dir, out, labels = Path(argv[0]), Path(argv[1]), argv[2:]
-        row = parse(run_dir)
+        row = {**parse(run_dir), "status": status}
     label_values = dict(pair.split("=", 1) for pair in labels)
     fields = list(label_values) + FIELDS
-    new_file = not out.exists()
-    with out.open("a", newline="") as f:
+    rows = []
+    if out.exists():
+        with out.open() as f:
+            rows = [r for r in csv.DictReader(f)
+                    if any(r.get(k) != v for k, v in label_values.items())]
+    rows.append({**label_values, **row})
+    with out.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields, restval="")
-        if new_file:
-            writer.writeheader()
-        writer.writerow({**label_values, **row})
+        writer.writeheader()
+        writer.writerows(rows)
     print({**label_values, **row})
 
 

@@ -17,14 +17,15 @@ for pool in $POOL_SIZES; do
     for repeat in $(seq 1 "$REPEATS"); do
         dir=$RESULTS/raw/pool/p${pool}_r${repeat}
         labels="pool_size=$pool strategy=$STRATEGY clients=$CLIENTS repeat=$repeat"
+        require_mains_power  # before touching $dir: never delete a valid earlier run
         rm -rf "$dir" && mkdir -p "$dir"
         echo "=== $(date +%H:%M:%S) $labels"
-
-        if reset_and_start_api HOLD_STRATEGY=$STRATEGY HOLD_SECONDS=2 DB_POOL_SIZE="$pool" &&
-           run_locust "$dir" RealisticUser $CLIENTS &&
-           record_run "$dir" pool_study.csv $labels; then
-            :
-        else
+        if ! { reset_and_start_api HOLD_STRATEGY=$STRATEGY HOLD_SECONDS=2 DB_POOL_SIZE="$pool" &&
+               run_locust "$dir" RealisticUser $CLIENTS; }; then
+            record_failure pool_study.csv $labels
+        elif ! power_held "$dir"; then
+            record_invalid "$dir" pool_study.csv $labels
+        elif ! record_run "$dir" pool_study.csv $labels; then
             record_failure pool_study.csv $labels
         fi
     done

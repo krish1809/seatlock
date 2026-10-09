@@ -64,12 +64,16 @@ def main(run_dir: Path, strategy: str, clients: str, repeat: str):
            "oversold_seats": oversold_seats, "api_seat_holds": api_seat_holds,
            "db_version_total": version_total, "db_matches_api": version_total == api_seat_holds,
            "in_flight_at_stop": api_seat_holds - successes}
-    new_file = not OUT.exists()
-    with OUT.open("a", newline="") as f:
+    rows = []
+    if OUT.exists():  # a re-run of the same strategy/clients/repeat replaces the old row
+        with OUT.open() as f:
+            rows = [r for r in csv.DictReader(f)
+                    if (r["strategy"], r["clients"], r["repeat"]) != (strategy, clients, repeat)]
+    rows.append(row)
+    with OUT.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=list(row))
-        if new_file:
-            writer.writeheader()
-        writer.writerow(row)
+        writer.writeheader()
+        writer.writerows(rows)
     print(row)
 
 
