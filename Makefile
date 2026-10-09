@@ -7,7 +7,7 @@ RUN := $(COMPOSE) run --rm api
 include .env
 PSQL := $(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -q -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-.PHONY: up down migrate seed test bench deadlock isolation
+.PHONY: up down migrate seed seed-large test bench deadlock isolation index-study
 
 # Created only if missing; edit .env afterwards to change ports or credentials.
 .env:
@@ -25,6 +25,11 @@ migrate:
 seed:
 	$(PSQL) --single-transaction < db/seed/seed_small.sql
 
+# 10M event_seats rows at SCALE=1, 1M at SCALE=0.1. Manages its own transaction.
+SCALE ?= 1
+seed-large:
+	$(PSQL) -v scale=$(SCALE) < db/seed/seed_large.sql
+
 test:
 	$(RUN) pytest
 
@@ -39,3 +44,13 @@ deadlock:
 # Isolation experiments (reseed the dev database). Writes docs/isolation-results.md.
 isolation:
 	$(RUN) python experiments/isolation/runner.py
+
+# Index study at 1M and 10M rows (bench/results/index_study.csv, docs/explain-plans/).
+# The api is stopped so its expiry sweeper cannot run during measurements.
+index-study:
+	$(COMPOSE) stop api
+	$(MAKE) seed-large SCALE=0.1
+	$(RUN) python bench/index_study.py --tier 1M
+	$(MAKE) seed-large SCALE=1
+	$(RUN) python bench/index_study.py --tier 10M
+	$(MAKE) seed

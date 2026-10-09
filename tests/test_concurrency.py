@@ -106,15 +106,25 @@ def test_failed_multi_seat_hold_changes_nothing(strategy, db):
     assert rows == [(1, "AVAILABLE", None, 0), (3, "AVAILABLE", None, 0)]  # rolled back, untouched
 
 
-def test_conditional_update_visits_rows_through_the_primary_key(db):
-    """The conditional UPDATE locks rows in the order its plan visits them.
+def test_conditional_update_locks_rows_in_seat_id_order(db):
+    """The conditional hold must lock rows in ascending seat_id, whatever the plan.
 
-    An index scan on (event_id, seat_id) visits the seat_id array in ascending
-    order, matching the lock order used everywhere else.
+    The rows are locked by a LockRows node; its input must be sorted by seat_id
+    (a Sort, or an index scan on the primary key, which returns that order).
     """
     from app.strategies.conditional import HOLD_IF_FREE_SQL
 
-    plan = db.execute("EXPLAIN (FORMAT JSON) " + HOLD_IF_FREE_SQL, (1, 300, 1, [5, 2, 9])).fetchone()[0]
-    scan = plan[0]["Plan"]["Plans"][0]
-    assert scan["Node Type"] == "Index Scan"
-    assert scan["Index Name"] == "event_seats_pkey"
+    params = {"event_id": 1, "seat_ids": [5, 2, 9], "user_id": 1, "seconds": 300}
+    plan = db.execute("EXPLAIN (FORMAT JSON, VERBOSE) " + HOLD_IF_FREE_SQL, params).fetchone()[0][0]["Plan"]
+
+    def nodes(node):
+        yield node
+        for child in node.get("Plans", []):
+            yield from nodes(child)
+
+    lock_rows = [n for n in nodes(plan) if n["Node Type"] == "LockRows"]
+    assert len(lock_rows) == 1
+    feeder = lock_rows[0]["Plans"][0]
+    ordered_by_sort = feeder["Node Type"] == "Sort" and feeder["Sort Key"] == ["event_seats.seat_id"]
+    ordered_by_pk = feeder["Node Type"] == "Index Scan" and feeder["Index Name"] == "event_seats_pkey"
+    assert ordered_by_sort or ordered_by_pk, feeder

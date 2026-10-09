@@ -1,0 +1,7 @@
+tier,event_seats_rows,config,index_size_bytes,scan_node,median_execution_ms,median_scan_ms,median_shared_buffers,median_scan_buffers,median_rows,runs_measured
+1M,1000000,none,0,Bitmap Heap Scan using event_seats_pkey,17.282,0.787,1590,119,2507.0,17
+1M,1000000,plain,7176192,Index Scan using idx_study_plain,17.12,0.312,1554,83,2507.0,17
+1M,1000000,partial,1802240,Index Scan using idx_study_partial,17.102,0.3,1554,83,2507.0,17
+10M,10000000,none,0,Index Scan using event_seats_pkey,18.306,1.458,1591,120,2494.0,17
+10M,10000000,plain,71622656,Index Scan using idx_study_plain,16.979,0.313,1554,83,2494.0,17
+10M,10000000,partial,17752064,Index Scan using idx_study_partial,16.944,0.31,1554,83,2494.0,17

@@ -1,0 +1,30 @@
+-- tier 1M, index config 'none', event_id 72
+-- recorded 2026-10-09T03:36:58+00:00 by bench/index_study.py
+-- EXPLAIN (ANALYZE, BUFFERS) SELECT es.seat_id, s.section, s.row_label, s.seat_no, es.price FROM event_seats AS es JOIN seats AS s ON s.id = es.seat_id WHERE es.event_id = 72 AND es.status = 'AVAILABLE' ORDER BY es.seat_id
+
+Sort  (cost=12664.55..12670.71 rows=2461 width=27) (actual time=17.343..17.410 rows=2464.00 loops=1)
+  Sort Key: es.seat_id
+  Sort Method: quicksort  Memory: 212kB
+  Buffers: shared hit=1590
+  ->  Hash Join  (cost=8529.93..12525.94 rows=2461 width=27) (actual time=9.648..17.139 rows=2464.00 loops=1)
+        Hash Cond: (s.id = es.seat_id)
+        Buffers: shared hit=1590
+        ->  Seq Scan on seats s  (cost=0.00..3471.00 rows=200000 width=22) (actual time=0.002..5.832 rows=200000.00 loops=1)
+              Buffers: shared hit=1471
+        ->  Hash  (cost=8499.16..8499.16 rows=2461 width=13) (actual time=0.931..0.932 rows=2464.00 loops=1)
+              Buckets: 4096  Batches: 1  Memory Usage: 141kB
+              Buffers: shared hit=119
+              ->  Bitmap Heap Scan on event_seats es  (cost=226.04..8499.16 rows=2461 width=13) (actual time=0.176..0.772 rows=2464.00 loops=1)
+                    Recheck Cond: (event_id = '72'::smallint)
+                    Filter: (status = 'AVAILABLE'::text)
+                    Rows Removed by Filter: 7536
+                    Heap Blocks: exact=78
+                    Buffers: shared hit=119
+                    ->  Bitmap Index Scan on event_seats_pkey  (cost=0.00..225.42 rows=9733 width=0) (actual time=0.164..0.164 rows=10000.00 loops=1)
+                          Index Cond: (event_id = '72'::smallint)
+                          Index Searches: 1
+                          Buffers: shared hit=41
+Planning:
+  Buffers: shared hit=8
+Planning Time: 0.119 ms
+Execution Time: 17.478 ms

@@ -1,0 +1,24 @@
+-- tier 1M, index config 'partial', event_id 72
+-- recorded 2026-10-09T03:36:59+00:00 by bench/index_study.py
+-- EXPLAIN (ANALYZE, BUFFERS) SELECT es.seat_id, s.section, s.row_label, s.seat_no, es.price FROM event_seats AS es JOIN seats AS s ON s.id = es.seat_id WHERE es.event_id = 72 AND es.status = 'AVAILABLE' ORDER BY es.seat_id
+
+Sort  (cost=4246.97..4253.20 rows=2494 width=27) (actual time=16.562..16.626 rows=2464.00 loops=1)
+  Sort Key: es.seat_id
+  Sort Method: quicksort  Memory: 212kB
+  Buffers: shared hit=1554
+  ->  Hash Join  (cost=110.24..4106.25 rows=2494 width=27) (actual time=9.066..16.364 rows=2464.00 loops=1)
+        Hash Cond: (s.id = es.seat_id)
+        Buffers: shared hit=1554
+        ->  Seq Scan on seats s  (cost=0.00..3471.00 rows=200000 width=22) (actual time=0.003..5.870 rows=200000.00 loops=1)
+              Buffers: shared hit=1471
+        ->  Hash  (cost=79.06..79.06 rows=2494 width=13) (actual time=0.432..0.433 rows=2464.00 loops=1)
+              Buckets: 4096  Batches: 1  Memory Usage: 141kB
+              Buffers: shared hit=83
+              ->  Index Scan using idx_study_partial on event_seats es  (cost=0.42..79.06 rows=2494 width=13) (actual time=0.007..0.276 rows=2464.00 loops=1)
+                    Index Cond: (event_id = '72'::smallint)
+                    Index Searches: 1
+                    Buffers: shared hit=83
+Planning:
+  Buffers: shared hit=8
+Planning Time: 0.131 ms
+Execution Time: 16.696 ms
