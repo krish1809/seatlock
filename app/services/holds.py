@@ -5,13 +5,21 @@ import psycopg
 
 from app.db import transaction, with_retries
 from app.strategies.base import HoldResult, HoldStrategy
+from app.strategies.conditional import ConditionalStrategy
 from app.strategies.naive import NaiveStrategy
+from app.strategies.optimistic import OptimisticStrategy
+from app.strategies.pessimistic import PessimisticStrategy
+from app.strategies.serializable import SerializableStrategy
 
-STRATEGIES: dict[str, HoldStrategy] = {s.name: s for s in [NaiveStrategy()]}
+STRATEGIES: dict[str, HoldStrategy] = {
+    s.name: s
+    for s in [NaiveStrategy(), PessimisticStrategy(), OptimisticStrategy(),
+              ConditionalStrategy(), SerializableStrategy()]
+}
 
 
 def get_strategy(name: str | None = None) -> HoldStrategy:
-    name = name or os.environ.get("HOLD_STRATEGY", "naive")
+    name = name or os.environ.get("HOLD_STRATEGY", "pessimistic")
     if name not in STRATEGIES:
         raise ValueError(f"unknown HOLD_STRATEGY {name!r}, expected one of {sorted(STRATEGIES)}")
     return STRATEGIES[name]

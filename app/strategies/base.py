@@ -33,3 +33,22 @@ class HoldStrategy(ABC):
 def hold_seconds() -> int:
     # Read on every call so tests can shorten holds with monkeypatch.setenv.
     return int(os.environ.get("HOLD_SECONDS", "300"))
+
+
+def mark_held(conn, event_id: int, seat_ids: list[int], user_id: int) -> datetime:
+    """Set the seats HELD for user_id. Does no check of its own: callers decide.
+
+    Every write to event_seats bumps version (see optimistic.py).
+    """
+    row = conn.execute(
+        """
+        UPDATE event_seats
+        SET status = 'HELD', held_by = %s,
+            held_until = now() + %s * interval '1 second',
+            version = version + 1
+        WHERE event_id = %s AND seat_id = ANY(%s)
+        RETURNING held_until
+        """,
+        (user_id, hold_seconds(), event_id, seat_ids),
+    ).fetchone()
+    return row["held_until"]
