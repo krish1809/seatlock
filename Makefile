@@ -7,7 +7,7 @@ RUN := $(COMPOSE) run --rm api
 include .env
 PSQL := $(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -q -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-.PHONY: up down migrate seed test bench deadlock
+.PHONY: up down migrate seed test bench deadlock isolation
 
 # Created only if missing; edit .env afterwards to change ports or credentials.
 .env:
@@ -35,3 +35,7 @@ bench:
 deadlock:
 	$(RUN) python experiments/deadlock/reproduce.py
 	$(RUN) python experiments/deadlock/fixed.py
+
+# Isolation experiments (reseed the dev database). Writes docs/isolation-results.md.
+isolation:
+	$(RUN) python experiments/isolation/runner.py
