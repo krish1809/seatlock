@@ -67,3 +67,16 @@ def test_replay_over_http_returns_200_with_the_same_booking(api):
 def test_missing_idempotency_key_is_rejected(api):
     status, _ = api("POST", "/bookings", {"user_id": 1, "event_id": 1, "seat_ids": SEATS})
     assert status == 422
+
+
+def test_reused_key_with_different_seats_returns_the_original_booking(db):
+    """The key wins and the new body is ignored (docs/design-decisions.md, Idempotency)."""
+    hold_for_user_1()
+    assert hold_seats(1, [20], user_id=1).success
+
+    first, _ = bookings.confirm(1, 1, SEATS, "key-reused")
+    second, created = bookings.confirm(1, 1, [20], "key-reused")
+
+    assert not created and second["id"] == first["id"]
+    assert [s["seat_id"] for s in second["seats"]] == SEATS
+    assert db.execute("SELECT status FROM event_seats WHERE event_id = 1 AND seat_id = 20").fetchone()[0] == "HELD"
