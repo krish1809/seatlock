@@ -7,7 +7,7 @@ RUN := $(COMPOSE) run --rm api
 include .env
 PSQL := $(COMPOSE) exec -T postgres psql -v ON_ERROR_STOP=1 -q -U $(POSTGRES_USER) -d $(POSTGRES_DB)
 
-.PHONY: up down migrate seed seed-large test bench deadlock isolation index-study
+.PHONY: up down migrate seed seed-large test bench deadlock isolation index-study pool-study plot env
 
 # Created only if missing; edit .env afterwards to change ports or credentials.
 .env:
@@ -33,8 +33,18 @@ seed-large:
 test:
 	$(RUN) pytest
 
+# Strategy benchmark, about 3 hours (bench/results/benchmark.csv, oversell.csv).
 bench:
-	@echo "bench: not implemented yet (Prompt 10)"
+	bash bench/run_all.sh
+
+pool-study:
+	bash bench/pool_study.sh
+
+plot:
+	$(RUN) python bench/plot.py
+
+env:
+	bash bench/environment.sh
 
 # Deadlock experiments (reseed the dev database). Writes bench/results/deadlocks.csv.
 deadlock:

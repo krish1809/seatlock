@@ -14,4 +14,5 @@ COPY . .
 RUN useradd --uid 1000 --create-home app
 USER app
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# No per-request access log: it would cost CPU during load tests.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

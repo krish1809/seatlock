@@ -22,6 +22,9 @@ os.environ["DATABASE_URL"] = make_conninfo(ADMIN_URL, dbname=TEST_DB)
 TEST_URL = os.environ["DATABASE_URL"]
 # Enough pooled connections for 50 threads to run their transactions at once.
 os.environ["DB_POOL_SIZE"] = "55"
+# Short waits so the lock-timeout and pool-exhaustion tests finish quickly.
+os.environ["LOCK_TIMEOUT_MS"] = "500"
+os.environ["DB_POOL_TIMEOUT_S"] = "1"
 
 
 @pytest.fixture(scope="session", autouse=True)

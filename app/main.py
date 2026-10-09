@@ -7,7 +7,8 @@ from fastapi.responses import JSONResponse
 from psycopg_pool import PoolTimeout
 from pydantic import BaseModel, Field
 
-from app.db import pool
+from app import metrics
+from app.db import POOL_SIZE, pool
 from app.errors import Conflict, NotFound
 from app.services import bookings, events, expiry, holds
 
@@ -145,6 +146,12 @@ def create_booking(
 @app.delete("/bookings/{booking_id}")
 def cancel_booking(booking_id: int):
     return bookings.cancel(booking_id)
+
+
+@app.get("/metrics")
+def get_metrics():
+    """Counters since this process started: hold outcomes, retries and give-ups by SQLSTATE."""
+    return {"strategy": holds.get_strategy().name, "pool_size": POOL_SIZE, "counters": metrics.snapshot()}
 
 
 @app.post("/admin/expire-holds")

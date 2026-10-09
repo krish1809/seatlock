@@ -10,6 +10,8 @@ import psycopg
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 
+from app import metrics
+
 log = logging.getLogger("seatlock.db")
 
 POOL_SIZE = int(os.environ.get("DB_POOL_SIZE", "10"))
@@ -76,8 +78,12 @@ def with_retries(fn):
             try:
                 return fn(*args, **kwargs)
             except psycopg.Error as e:
-                if e.sqlstate not in RETRYABLE or attempt == MAX_RETRIES:
+                if e.sqlstate not in RETRYABLE:
                     raise
+                if attempt == MAX_RETRIES:
+                    metrics.inc(f"aborts.{e.sqlstate}")  # gave up: the client gets a 409
+                    raise
+                metrics.inc(f"retries.{e.sqlstate}")
                 if e.sqlstate == "40P01":
                     log.warning("deadlock detected, retry %d: %s", attempt + 1, e)
                 # Full jitter: sleep a random time up to an exponentially growing

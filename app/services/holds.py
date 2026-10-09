@@ -3,6 +3,7 @@ import os
 
 import psycopg
 
+from app import metrics
 from app.db import transaction, with_retries
 from app.strategies.base import HoldResult, HoldStrategy, hold_seconds
 from app.strategies.conditional import ConditionalStrategy
@@ -27,9 +28,16 @@ def get_strategy(name: str | None = None) -> HoldStrategy:
 
 def hold_seats(event_id: int, seat_ids: list[int], user_id: int, strategy_name: str | None = None) -> HoldResult:
     strategy = get_strategy(strategy_name)
-    # Ascending seat_id is the single lock order every code path uses, so two
-    # multi-seat transactions can never wait on each other in a cycle (deadlock).
-    return _attempt(strategy, event_id, sorted(set(seat_ids)), user_id)
+    try:
+        # Ascending seat_id is the single lock order every code path uses, so two
+        # multi-seat transactions can never wait on each other in a cycle (deadlock).
+        result = _attempt(strategy, event_id, sorted(set(seat_ids)), user_id)
+    except Exception:
+        metrics.inc("holds.error")
+        raise
+    metrics.inc("holds.won" if result.success else "holds.lost")
+    metrics.inc("holds.won_seats", len(result.held))
+    return result
 
 
 @with_retries

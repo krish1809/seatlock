@@ -1,0 +1,40 @@
+# Runs the migrations and the full test suite against a real PostgreSQL 18
+# service container on every push (and pull request).
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: seatlock
+          POSTGRES_PASSWORD: seatlock
+          POSTGRES_DB: seatlock
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U seatlock -d seatlock"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql://seatlock:seatlock@localhost:5432/seatlock
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Migrate a fresh database, twice (must be a no-op the second time)
+        run: |
+          python db/migrate.py
+          python db/migrate.py
+      - name: Tests (they create and migrate their own seatlock_test database)
+        run: pytest

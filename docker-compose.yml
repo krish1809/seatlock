@@ -1,6 +1,8 @@
 services:
   postgres:
     image: postgres:18
+    # The pool study goes up to a 100-connection pool; the default limit is 100.
+    command: postgres -c max_connections=200
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
