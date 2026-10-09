@@ -17,7 +17,8 @@ what each approach costs.
 ## 2. Functional requirements
 
 - **F1 Browse.** List events. For one event, list its seats with status and price,
-  optionally only the available ones. A seat whose hold has expired counts as available.
+  optionally only the available ones. A seat whose hold has expired is listed as
+  available again once the expiry job has reset it (every few seconds).
 - **F2 Hold.** A user holds 1 to 6 seats of one event for 5 minutes (shorter in tests).
   The hold is all-or-nothing: if any requested seat is unavailable, no seat is held.
 - **F3 Confirm.** A user turns seats they currently hold into a booking. The request

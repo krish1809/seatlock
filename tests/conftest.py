@@ -55,3 +55,46 @@ def db():
     """A plain autocommit connection: every statement is its own transaction."""
     with psycopg.connect(TEST_URL, autocommit=True) as conn:
         yield conn
+
+
+@pytest.fixture(scope="session")
+def api(test_database):
+    """Call the real FastAPI app over HTTP: (method, path, json, headers) -> (status, body).
+
+    Runs uvicorn on a thread with lifespan off: the session fixture already
+    opened the pool, and the expiry sweeper stays off so tests control timing.
+    Uses only the standard library (urllib), so no extra test dependency.
+    """
+    import json
+    import socket
+    import threading
+    import time
+    import urllib.error
+    import urllib.request
+
+    import uvicorn
+
+    from app.main import app
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, lifespan="off", log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    while not server.started:
+        time.sleep(0.01)
+
+    def call(method, path, json_body=None, headers=None):
+        data = json.dumps(json_body).encode() if json_body is not None else None
+        req = urllib.request.Request(f"http://127.0.0.1:{port}{path}", data=data, method=method,
+                                     headers={"content-type": "application/json", **(headers or {})})
+        try:
+            with urllib.request.urlopen(req) as resp:
+                return resp.status, json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read())
+
+    yield call
+    server.should_exit = True
+    thread.join()
