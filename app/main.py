@@ -70,6 +70,12 @@ class HoldRequest(BaseModel):
     seat_ids: list[int] = Field(min_length=1, max_length=6)
 
 
+class BestAvailableRequest(BaseModel):
+    user_id: int
+    count: int = Field(ge=1, le=6)
+    section: str
+
+
 class BookingRequest(BaseModel):
     user_id: int
     event_id: int
@@ -108,6 +114,19 @@ def create_hold(event_id: int, body: HoldRequest):
         "seat_ids": result.held,
         "held_until": result.held_until,
         "strategy": holds.get_strategy().name,
+    }
+
+
+@app.post("/events/{event_id}/holds/best-available", status_code=201)
+def create_best_available_hold(event_id: int, body: BestAvailableRequest):
+    result = holds.hold_best_available(event_id, body.section, body.count, body.user_id)
+    if not result.success:
+        raise Conflict(f"fewer than {body.count} free seats in section {body.section}")
+    return {
+        "event_id": event_id,
+        "user_id": body.user_id,
+        "seat_ids": result.held,
+        "held_until": result.held_until,
     }
 
 
