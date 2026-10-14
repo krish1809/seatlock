@@ -41,6 +41,6 @@ Collected by `bench/environment.sh` on 2026-10-09 04:05 UTC.
 | --- | --- |
 | Python | Python 3.12.15 |
 | Packages | fastapi==0.142.2 uvicorn==0.54.0 psycopg[binary]==3.3.6 psycopg-pool==3.3.3 pytest==9.1.1 locust==2.46.7 matplotlib==3.11.2  |
-| SeatLock commit | 1ea1662 |
+| SeatLock commit | fad1211 |
 | api | 1 uvicorn process, FastAPI sync endpoints (default thread pool), pool size from DB_POOL_SIZE |
 | Locust | runs in a container from the same image, on the same host, same Docker network |
