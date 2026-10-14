@@ -109,23 +109,15 @@ def pool_table(pool):
     print()
 
 
-def cpu_table():
-    """Median CPU% per container, sampled 40 s into each run (raw/*/docker_stats.csv)."""
-    samples = defaultdict(lambda: defaultdict(list))
-    for path in RESULTS.glob("raw/*/*/*/docker_stats.csv"):
-        workload = path.parts[-4]
-        for line in path.read_text().splitlines():
-            name, cpu, _ = line.split(",", 2)
-            role = "locust" if "-run-" in name else name.split("-")[1]
-            samples[workload][role].append(float(cpu.rstrip("%")))
-    if not samples:
-        return
-    print("Container CPU 40 s into each run, median over all runs (100% = one core)\n")
+def cpu_table(bench):
+    """Median CPU% per container, sampled 40 s into each valid run (benchmark.csv)."""
+    print("Container CPU 40 s into each run, median over valid runs (100% = one core)\n")
     print("| Workload | api | postgres | locust |")
     print("| --- | ---: | ---: | ---: |")
-    for workload, roles in sorted(samples.items()):
-        print(f"| {workload} | " + " | ".join(f"{med(roles[r]):.0f}%" if roles[r] else "TODO"
-                                         for r in ("api", "postgres", "locust")) + " |")
+    for workload, rows in sorted(group(ok(bench), "workload").items()):
+        cells = [med([float(r[f"{c}_cpu_pct"]) for r in rows if r.get(f"{c}_cpu_pct")])
+                 for c in ("api", "postgres", "locust")]
+        print(f"| {workload[0]} | " + " | ".join("TODO" if v is None else f"{v:.0f}%" for v in cells) + " |")
     print()
 
 
@@ -136,5 +128,5 @@ if __name__ == "__main__":
         oversell_table(oversell)
         throughput_table(bench, "hot")
         throughput_table(bench, "mix")
-        cpu_table()
+        cpu_table(bench)
     pool_table(read("pool_study.csv"))

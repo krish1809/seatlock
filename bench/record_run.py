@@ -1,7 +1,9 @@
 """Turn one Locust run directory into one CSV row.
 
-Reads RUN_DIR/locust_stats.csv (written by Locust, measured part of the run only)
-and RUN_DIR/metrics.json (the api's /metrics counters after the run).
+Reads RUN_DIR/locust_stats.csv (written by Locust, measured part of the run only),
+RUN_DIR/metrics.json (the api's /metrics counters after the run) and
+RUN_DIR/docker_stats.csv (CPU of each container 40 s into the run). The run
+directories are local working output and are not committed; this row is.
 
 Usage: python bench/record_run.py RUN_DIR OUT_CSV key=value ...      (a finished run)
        python bench/record_run.py --failed OUT_CSV key=value ...     (a run that failed)
@@ -19,7 +21,21 @@ from pathlib import Path
 FIELDS = ["status", "requests", "failures", "rps", "p50_ms", "p95_ms", "p99_ms",
           "hold_requests", "hold_rps", "hold_p50_ms", "hold_p95_ms", "hold_p99_ms",
           "holds_won", "holds_lost", "holds_error",
-          "retries_40001", "retries_40P01", "aborts_40001", "aborts_40P01"]
+          "retries_40001", "retries_40P01", "aborts_40001", "aborts_40P01",
+          "api_cpu_pct", "postgres_cpu_pct", "locust_cpu_pct"]
+
+
+def cpu_sample(run_dir: Path) -> dict:
+    """CPU % per container, sampled once 40 s into the run (bench/lib.sh, sample_cpu)."""
+    path = run_dir / "docker_stats.csv"
+    if not path.exists():
+        return {}
+    row = {}
+    for line in path.read_text().splitlines():
+        name, cpu, _ = line.split(",", 2)
+        role = "locust" if "-run-" in name else name.split("-")[1]  # seatlock-api-run-<id> is Locust
+        row[f"{role}_cpu_pct"] = cpu.rstrip("%")
+    return row
 
 
 def parse(run_dir: Path) -> dict:
@@ -40,6 +56,7 @@ def parse(run_dir: Path) -> dict:
     for key in ["holds.won", "holds.lost", "holds.error", "retries.40001", "retries.40P01",
                 "aborts.40001", "aborts.40P01"]:
         row[key.replace(".", "_")] = counters.get(key, 0)
+    row.update(cpu_sample(run_dir))
     return row
 
 

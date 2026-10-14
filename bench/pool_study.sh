@@ -2,7 +2,8 @@
 # Pool study: one strategy (pessimistic, the one that holds row locks while it
 # works), the realistic mix at 200 clients, pool sizes 5, 20, 50 and 100.
 #
-# Usage: bench/pool_study.sh        Output: bench/results/pool_study.csv, bench/results/raw/pool/
+# Usage: bench/pool_study.sh        Output: bench/results/pool_study.csv (committed),
+#                                           bench/results/raw/pool/ (local, not committed)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 source .env

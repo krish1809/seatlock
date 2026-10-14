@@ -7,7 +7,8 @@
 #
 # Usage: bench/run_all.sh                      (all, about 3 hours)
 #        STRATEGIES="naive conditional" CLIENTS="50" REPEATS=1 WORKLOADS=hot bench/run_all.sh
-# Outputs: bench/results/benchmark.csv, bench/results/oversell.csv, bench/results/raw/
+# Outputs: bench/results/benchmark.csv, bench/results/oversell.csv (committed), and the
+#          per-run working files in bench/results/raw/ (local, not committed)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 source .env

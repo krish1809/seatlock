@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
-# Raw per-run hold logs are large; bench/results/oversell.csv keeps what they prove.
-bench/results/raw*/**/holds.jsonl
+# Per-run benchmark working files (Locust logs, histories, /metrics, CPU samples).
+# Each run's numbers are one row of bench/results/*.csv, which are committed.
+bench/results/raw*/

@@ -109,7 +109,7 @@ What the numbers say:
   at 1,002 to 1,041 hold requests/s at 200 clients, and stayed flat from 10 to 200 clients.
   The api process, not the database, was the bottleneck: 40 s into each hot-seat run the api
   container used a median of 139% CPU against 36% for PostgreSQL and 35% for Locust
-  (`docker stats`, files `bench/results/raw/*/*/*/docker_stats.csv`, median printed by
+  (`docker stats`, the `*_cpu_pct` columns of `bench/results/benchmark.csv`, median printed by
   `make summary`). Latency grows with clients because requests queue in the api.
 - **Serializable is the one strategy with a visible cost:** 867 hold requests/s and a p99 of
   350 ms at 200 clients, against 1,002 to 1,041 and 300 to 310 ms for the others. It retried
@@ -206,7 +206,8 @@ Tests for each: [`tests/test_failures.py`](tests/test_failures.py), [`tests/test
 - **Runs:** for each strategy, workload and client count (10, 50, 100, 200): reseed the
   small data set, recreate the api with that strategy, run 70 s and discard the first 10 s,
   3 repeats; medians reported ([`bench/run_all.sh`](bench/run_all.sh), 120 runs).
-  Raw Locust CSVs, `/metrics` snapshots and CPU samples are in `bench/results/raw/`.
+  Each run is one row of `benchmark.csv`: Locust's numbers, the api's `/metrics` counters and
+  the CPU sample. The raw per-run output stays local in `bench/results/raw/` and is not committed.
 - **Holds last 2 s** during the benchmark, so seats keep freeing up and the contention lasts
   the whole run. Hot-seat runs turn the expiry sweeper off, so every write to a hot seat is a
   hold; the sum of the hot seats' `version` columns equals the api's own count of held seats
