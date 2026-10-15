@@ -218,8 +218,8 @@ def pool_size(rows):
         ax.set_xticks(sizes)
         ax.set_xlabel("connection pool size")
         ax.set_ylabel(label)
-        ax.set_ylim(bottom=0)
-        ax.set_title(f"{title} vs pool size")
+        ax.set_ylim(0, max(y for y in ys if y is not None) * 1.15)  # room for the value labels
+        ax.set_title(f"{title} vs pool size", pad=10)
     fig.tight_layout()
     finish(fig, "pool_size.png", f"Pessimistic strategy, realistic mix, {rows[0]['clients']} clients. "
            f"Median of runs; source bench/results/pool_study.csv; {failed_note(failed)}.")

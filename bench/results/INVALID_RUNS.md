@@ -1,11 +1,11 @@
-# Runs marked invalid
+# Runs marked invalid, and their re-run
 
 On 2026-10-09 the laptop running the benchmark was unplugged at about 11:58:58 local time
 (UTC+05:30) and finished the run on battery. On battery the CPU is throttled, so every
-run measured after that moment is not comparable with the runs before it. Those runs are
-kept, with their numbers, as `status = invalid` in the CSVs, and their raw output was moved
-to `bench/results/raw_invalid/` (local working files, not committed). `bench/summary.py`
-and `bench/plot.py` leave them out.
+run measured after that moment is not comparable with the runs before it. Those runs were
+marked `status = invalid` (summaries and charts skip that status) and their raw output was
+moved to `bench/results/raw_invalid/` (local working files, not committed). On 2026-10-15 they
+were re-run on AC power; the CSVs now hold the re-run results (last section).
 
 ## Evidence
 
@@ -37,14 +37,21 @@ and `bench/plot.py` leave them out.
 
 All 60 hot-seat runs and the other 52 realistic-mix runs finished before 11:58:58.
 
-## Re-running them (on AC power)
+## Re-run on 2026-10-15 (on AC power)
+
+Before re-running, one calibration run repeated a configuration measured on 2026-10-09:
+pessimistic, realistic mix, 200 clients, pool 10. It gave 474.18 requests/s; the three
+original runs gave 475.02, 482.37 and 468.62 (`benchmark.csv`). The machine performed the same.
+The application and benchmark code were unchanged since the benchmarked commit (no diff in
+`app/`, `db/`, `bench/locustfile.py`, the Dockerfile, docker-compose.yml or requirements.txt).
+
+Then these were run again, and every run recorded AC power at its 40-second sample and at its end:
 
 ```bash
-STRATEGIES=serializable WORKLOADS=mix CLIENTS="50 100 200" bench/run_all.sh   # about 12 min
-bench/pool_study.sh                                                         # about 16 min
-make plot && make summary
+STRATEGIES=serializable WORKLOADS=mix CLIENTS="50 100 200" bench/run_all.sh
+bench/pool_study.sh
 ```
 
-A re-run replaces the rows with the same labels. Since this incident the scripts refuse to
-start on battery and record a run as invalid if AC power is missing at its 40-second
-sample or at its end (`bench/lib.sh`).
+The re-runs replaced the invalid rows; `benchmark.csv` and `pool_study.csv` now contain no
+`invalid` rows. Serializable at 50 clients was re-run as a full set of 3, including the
+repeat that had been valid, so all three come from the same session.

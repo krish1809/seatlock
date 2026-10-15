@@ -66,10 +66,10 @@ Hot-seat workload at 200 clients, median of 3 runs, from
 | pessimistic | `SELECT ... ORDER BY seat_id FOR UPDATE` locks the rows first; a second holder waits, then sees `HELD`. | 0 | 1,013 | 310 | 0.00 | 475 |
 | optimistic | Reads `version` without locking, then `UPDATE ... WHERE version = <read>`; 0 rows updated means the race was lost. | 0 | 1,002 | 310 | 0.00 | 487 |
 | conditional | One `UPDATE ... WHERE <seat is free> RETURNING`; the check runs under the row lock. Rows are locked in a CTE `ORDER BY seat_id`. | 0 | 1,023 | 310 | 0.00 | 482 |
-| serializable | The naive code at `SERIALIZABLE`: Postgres aborts one of two conflicting transactions (40001) and the service retries. | 0 | 867 | 350 | 0.46 | TODO |
+| serializable | The naive code at `SERIALIZABLE`: Postgres aborts one of two conflicting transactions (40001) and the service retries. | 0 | 867 | 350 | 0.46 | 430 |
 
-The serializable realistic-mix runs at 100 and 200 clients were measured after the laptop
-lost AC power and are excluded; see [bench/results/INVALID_RUNS.md](bench/results/INVALID_RUNS.md).
+The serializable realistic-mix runs at 50, 100 and 200 clients are from a re-run on AC power on
+2026-10-15, after the first attempt ran on battery; see [bench/results/INVALID_RUNS.md](bench/results/INVALID_RUNS.md).
 Over every hot-seat run:
 
 | Strategy | Runs | Runs with a double booking | Double-booked holds, total | Seat holds (api count), total | DB `version` sum equals api count |
@@ -92,7 +92,7 @@ Hot seat:
 | conditional | 1,006 | 1,002 | 1,043 | 1,023 |
 | serializable | 893 | 905 | 876 | 867 |
 
-Realistic mix (serializable at 50 clients is one valid run; 100 and 200 are invalid):
+Realistic mix (serializable at 50 to 200 clients from the 2026-10-15 re-run):
 
 | Strategy | 10 clients | 50 clients | 100 clients | 200 clients |
 | --- | ---: | ---: | ---: | ---: |
@@ -100,7 +100,7 @@ Realistic mix (serializable at 50 clients is one valid run; 100 and 200 are inva
 | pessimistic | 557 | 540 | 490 | 475 |
 | optimistic | 564 | 505 | 477 | 487 |
 | conditional | 567 | 532 | 494 | 482 |
-| serializable | 536 | 504 | TODO | TODO |
+| serializable | 536 | 477 | 476 | 430 |
 
 </details>
 
@@ -114,8 +114,9 @@ What the numbers say:
 - **Serializable is the one strategy with a visible cost:** 867 hold requests/s and a p99 of
   350 ms at 200 clients, against 1,002 to 1,041 and 300 to 310 ms for the others. It retried
   0.46 times per 100 holds on 40001, and a median of 1 request per run still failed after 3
-  retries and got a 409. These numbers do not show which part of the cost comes from retries
-  and which from the extra serializable bookkeeping.
+  retries and got a 409. On the realistic mix it reached 430 requests/s and a p99 of 700 ms
+  at 200 clients, against 475 to 498 and 620 to 630 ms. These numbers do not show which part
+  of the cost comes from retries and which from the extra serializable bookkeeping.
 - **A lost race is a 409, not a retry.** Optimistic shows 0 retries: a changed `version`
   means the seat is taken, so retrying could not succeed.
 
@@ -215,14 +216,30 @@ Tests for each: [`tests/test_failures.py`](tests/test_failures.py), [`tests/test
 - **Setup:** one uvicorn process, a pool of 10 connections, PostgreSQL 18.6 with default
   settings except `max_connections = 200`, all on one laptop (13th Gen Intel Core i7-13620H,
   16 logical CPUs, 15 GiB RAM). Full list: [bench/results/ENVIRONMENT.md](bench/results/ENVIRONMENT.md).
-- **Power:** the laptop was unplugged near the end of the run. The 20 runs measured on
-  battery are kept as evidence but excluded; [bench/results/INVALID_RUNS.md](bench/results/INVALID_RUNS.md)
-  has the battery log and the throughput step that show it. The scripts now refuse to run on battery.
+- **Power:** the laptop was unplugged near the end of the first run, which halved throughput.
+  The 20 runs measured on battery were repeated on AC power on 2026-10-15, with the same code,
+  after a calibration run matched the original numbers (474.18 requests/s against 469 to 482
+  for the same configuration). [bench/results/INVALID_RUNS.md](bench/results/INVALID_RUNS.md)
+  has the evidence. The scripts now refuse to run on battery.
 
-**Pool study** ([`bench/pool_study.sh`](bench/pool_study.sh): pessimistic, realistic mix,
-200 clients, pool sizes 5, 20, 50 and 100): TODO. All 12 runs were measured on battery and are
-invalid; they need to be re-run on AC power (commands in
-[bench/results/INVALID_RUNS.md](bench/results/INVALID_RUNS.md)).
+**Pool study** ([`bench/pool_study.sh`](bench/pool_study.sh)): the pessimistic strategy on the
+realistic mix at 200 clients, with different connection pool sizes, median of 3 runs each
+([`bench/results/pool_study.csv`](bench/results/pool_study.csv)).
+
+| Pool size | Req/s | p50 ms | p99 ms |
+| ---: | ---: | ---: | ---: |
+| 5 | 381 | 510 | 780 |
+| 20 | 513 | 390 | 540 |
+| 50 | 520 | 380 | 560 |
+| 100 | 515 | 380 | 540 |
+
+![Pool size](docs/img/pool_size.png)
+
+Five connections are too few: requests queue for a free connection, throughput drops to 381
+requests/s and p99 rises to 780 ms. From 20 connections on, more connections change nothing (513 to 520 requests/s):
+the single api process is already the limit, at a median of 124.68% CPU against 36.87% for
+PostgreSQL in those 9 runs (`*_cpu_pct` columns of `pool_study.csv`). The strategy benchmark used 10
+connections and measured 475 requests/s for the same configuration on 2026-10-09.
 
 Machine, Docker limits, PostgreSQL settings and package versions, collected by a script:
 [bench/results/ENVIRONMENT.md](bench/results/ENVIRONMENT.md).
